@@ -1,24 +1,29 @@
-# Proyecto: Sistema de Asistencia con Streamlit y Supabase
+# Proyecto: Sistema de Asistencia con Streamlit y PostgreSQL
 import streamlit as st
 import cv2
 import qrcode
 from datetime import datetime
 import os
+import psycopg2
+from psycopg2 import sql
 import pandas as pd
 import numpy as np
-from supabase import create_client, Client
 
 # Configuración de la página
 st.set_page_config(page_title="Asistencia QR", page_icon="🎓", layout="centered")
 st.title("📚 Registro de Asistencia - App Streamlit")
 
-# Configuración de Supabase (reemplaza con tus credenciales)
+# Configuración de la conexión a PostgreSQL
 @st.cache_resource
-def init_supabase():
-    url = st.secrets["postgresql://postgres.fqcfrnfnsfxvjurnhtkd:zlfR123@#$@aws-0-us-east-1.pooler.supabase.com:6543/postgres"]["url"]
-    return create_client(url)
+def init_db_connection():
+    try:
+        conn = psycopg2.connect(st.secrets["postgresql"]["postgresql://postgres.fqcfrnfnsfxvjurnhtkd:zlfR123@#$@aws-0-us-east-1.pooler.supabase.com:6543/postgres"])
+        return conn
+    except Exception as e:
+        st.error(f"Error al conectar a la base de datos: {e}")
+        return None
 
-supabase = init_supabase()
+conn = init_db_connection()
 
 # Datos de materias y generación de códigos QR únicos
 materias = {
@@ -39,56 +44,99 @@ for nombre, qr_id in materias.items():
         img_qr = qrcode.make(qr_id)
         img_qr.save(nombre_archivo)
 
-# Funciones para interactuar con Supabase
+# Funciones para interactuar con PostgreSQL
 def cargar_usuarios():
-    response = supabase.table('usuarios').select("*").execute()
-    if not response.data:
-        # Crear usuario admin por defecto si no hay usuarios
-        registrar_usuario("admin", "Administrador", "admin", "administrador")
-        return cargar_usuarios()
-    return pd.DataFrame(response.data)
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM usuarios;")
+            usuarios = cur.fetchall()
+            if not usuarios:
+                # Crear usuario admin por defecto si no hay usuarios
+                registrar_usuario("admin", "Administrador", "admin", "administrador")
+                return cargar_usuarios()
+            return pd.DataFrame(usuarios, columns=['id', 'usuario', 'nombre', 'password', 'rol', 'created_at'])
+    except Exception as e:
+        st.error(f"Error al cargar usuarios: {e}")
+        return pd.DataFrame()
 
 def registrar_usuario(nuevo_usuario, nombre_completo, password, rol):
-    data = {
-        "usuario": nuevo_usuario,
-        "nombre": nombre_completo,
-        "password": password,
-        "rol": rol
-    }
-    supabase.table('usuarios').insert(data).execute()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                sql.SQL("INSERT INTO usuarios (usuario, nombre, password, rol) VALUES (%s, %s, %s, %s)"),
+                [nuevo_usuario, nombre_completo, password, rol]
+            )
+            conn.commit()
+    except Exception as e:
+        st.error(f"Error al registrar usuario: {e}")
 
 def autenticar_usuario(usuario, password):
-    response = supabase.table('usuarios').select("*").eq("usuario", usuario).eq("password", password).execute()
-    if response.data:
-        registro = response.data[0]
-        return registro['nombre'], registro['rol']
-    return None, None
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                sql.SQL("SELECT nombre, rol FROM usuarios WHERE usuario = %s AND password = %s"),
+                [usuario, password]
+            )
+            result = cur.fetchone()
+            return result if result else (None, None)
+    except Exception as e:
+        st.error(f"Error al autenticar usuario: {e}")
+        return None, None
 
 def registrar_asistencia(nombre, id_materia, materia, fecha, hora):
-    data = {
-        "nombre": nombre,
-        "id_materia": id_materia,
-        "materia": materia,
-        "fecha": fecha,
-        "hora": hora
-    }
-    supabase.table('asistencias').insert(data).execute()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                sql.SQL("""
+                    INSERT INTO asistencias (nombre, id_materia, materia, fecha, hora) 
+                    VALUES (%s, %s, %s, %s, %s)
+                """),
+                [nombre, id_materia, materia, fecha, hora]
+            )
+            conn.commit()
+    except Exception as e:
+        st.error(f"Error al registrar asistencia: {e}")
 
 def obtener_asistencias(filtro_materia=None, filtro_fecha=None):
-    query = supabase.table('asistencias').select("*")
-    
-    if filtro_materia and filtro_materia != "Todas":
-        query = query.eq("materia", filtro_materia)
-    if filtro_fecha:
-        fecha_str = filtro_fecha.strftime("%Y-%m-%d")
-        query = query.eq("fecha", fecha_str)
-    
-    response = query.execute()
-    return pd.DataFrame(response.data)
+    try:
+        query = "SELECT * FROM asistencias"
+        conditions = []
+        params = []
+        
+        if filtro_materia and filtro_materia != "Todas":
+            conditions.append("materia = %s")
+            params.append(filtro_materia)
+        
+        if filtro_fecha:
+            conditions.append("fecha = %s")
+            params.append(filtro_fecha.strftime("%Y-%m-%d"))
+        
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+        
+        with conn.cursor() as cur:
+            cur.execute(query, params)
+            columns = [desc[0] for desc in cur.description]
+            data = cur.fetchall()
+            return pd.DataFrame(data, columns=columns)
+    except Exception as e:
+        st.error(f"Error al obtener asistencias: {e}")
+        return pd.DataFrame()
 
 def verificar_asistencia_existente(nombre, id_materia, fecha):
-    response = supabase.table('asistencias').select("*").eq("nombre", nombre).eq("id_materia", id_materia).eq("fecha", fecha).execute()
-    return len(response.data) > 0
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                sql.SQL("""
+                    SELECT COUNT(*) FROM asistencias 
+                    WHERE nombre = %s AND id_materia = %s AND fecha = %s
+                """),
+                [nombre, id_materia, fecha]
+            )
+            return cur.fetchone()[0] > 0
+    except Exception as e:
+        st.error(f"Error al verificar asistencia: {e}")
+        return False
 
 # Inicializar variables de sesión
 if "logged_in" not in st.session_state:
