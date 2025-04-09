@@ -131,49 +131,56 @@ if st.session_state.logged_in:
         nombre_qr = f"QR_{materia_seleccionada.replace(' ', '')}.png"
         if os.path.exists(nombre_qr):
             st.image(nombre_qr, width=150, caption=f"Código QR para {materia_seleccionada}")
-        st.info(f"Escanea el código QR de **{materia_seleccionada}**.")
-        image = st.camera_input("Escanear Código QR")
 
-        if image is not None:
-            bytes_data = image.getvalue()
-            arr = np.frombuffer(bytes_data, np.uint8)
-            img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
-            detector = cv2.QRCodeDetector()
-            data, bbox, _ = detector.detectAndDecode(img)
-            if data:
-                scanned_qr = data.strip()
-                if scanned_qr != materias[materia_seleccionada]:
-                    st.error("El código QR no corresponde a la materia seleccionada.")
-                else:
-                    conn = conectar_bd()
-                    if conn:
-                        try:
-                            cursor = conn.cursor()
-                            estudiante = st.session_state.nombre
-                            ahora = datetime.now()
-                            fecha_str = ahora.strftime("%Y-%m-%d")
-                            hora_str = ahora.strftime("%H:%M:%S")
-                            created_at = ahora.strftime("%Y-%m-%d %H:%M:%S")
-                            cursor.execute("""
-                                SELECT * FROM asistencias
-                                WHERE nombre = %s AND id_materia = %s AND fecha = %s;
-                            """, (estudiante, materias[materia_seleccionada], fecha_str))
-                            existe = cursor.fetchall()
-                            if existe:
-                                st.warning("Ya has registrado asistencia para esta materia hoy.")
-                            else:
+        if "qr_mode" not in st.session_state:
+            st.session_state.qr_mode = False
+
+        if not st.session_state.qr_mode:
+            if st.button("Activar escáner QR"):
+                st.session_state.qr_mode = True
+                st.rerun()
+        else:
+            image = st.camera_input("Escanea el código QR")
+            if image is not None:
+                bytes_data = image.getvalue()
+                arr = np.frombuffer(bytes_data, np.uint8)
+                img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+                detector = cv2.QRCodeDetector()
+                data, bbox, _ = detector.detectAndDecode(img)
+                if data:
+                    scanned_qr = data.strip()
+                    if scanned_qr != materias[materia_seleccionada]:
+                        st.error("El código QR no corresponde a la materia seleccionada.")
+                    else:
+                        conn = conectar_bd()
+                        if conn:
+                            try:
+                                cursor = conn.cursor()
+                                estudiante = st.session_state.nombre
+                                ahora = datetime.now()
+                                fecha_str = ahora.strftime("%Y-%m-%d")
+                                hora_str = ahora.strftime("%H:%M:%S")
+                                created_at = ahora.strftime("%Y-%m-%d %H:%M:%S")
                                 cursor.execute("""
-                                    INSERT INTO asistencias (nombre, id_materia, materia, fecha, hora, created_at)
-                                    VALUES (%s, %s, %s, %s, %s, %s);
-                                """, (estudiante, materias[materia_seleccionada], materia_seleccionada, fecha_str, hora_str, created_at))
-                                conn.commit()
-                                st.success(f"Asistencia registrada para {materia_seleccionada} - {fecha_str} {hora_str}")
-                            cursor.close()
-                            conn.close()
-                        except Exception as e:
-                            st.error(f"No se pudo registrar la asistencia: {e}")
-            else:
-                st.error("No se pudo leer el código QR.")
+                                    SELECT * FROM asistencias
+                                    WHERE nombre = %s AND id_materia = %s AND fecha = %s;
+                                """, (estudiante, materias[materia_seleccionada], fecha_str))
+                                existe = cursor.fetchall()
+                                if existe:
+                                    st.warning("Ya has registrado asistencia para esta materia hoy.")
+                                else:
+                                    cursor.execute("""
+                                        INSERT INTO asistencias (nombre, id_materia, materia, fecha, hora, created_at)
+                                        VALUES (%s, %s, %s, %s, %s, %s);
+                                    """, (estudiante, materias[materia_seleccionada], materia_seleccionada, fecha_str, hora_str, created_at))
+                                    conn.commit()
+                                    st.success(f"Asistencia registrada para {materia_seleccionada} - {fecha_str} {hora_str}")
+                                cursor.close()
+                                conn.close()
+                            except Exception as e:
+                                st.error(f"No se pudo registrar la asistencia: {e}")
+                st.session_state.qr_mode = False
+                st.rerun()
 
     elif st.session_state.rol == "administrador":
         st.header("Panel de Administrador - Registros de Asistencia")
