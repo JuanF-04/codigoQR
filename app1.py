@@ -135,11 +135,17 @@ if st.session_state.logged_in:
         if "qr_mode" not in st.session_state:
             st.session_state.qr_mode = False
 
-        if not st.session_state.qr_mode:
-            if st.button("Activar escáner QR"):
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("📷 Activar escáner QR"):
                 st.session_state.qr_mode = True
                 st.rerun()
-        else:
+        with col2:
+            if st.button("❌ Cancelar escaneo"):
+                st.session_state.qr_mode = False
+                st.rerun()
+
+        if st.session_state.qr_mode:
             image = st.camera_input("Escanea el código QR")
             if image is not None:
                 bytes_data = image.getvalue()
