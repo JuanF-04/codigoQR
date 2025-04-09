@@ -4,3 +4,4 @@ numpy
 opencv-python
 qrcode
 psycopg2-binary
+libgl1

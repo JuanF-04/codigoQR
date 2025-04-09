@@ -162,18 +162,19 @@ if st.session_state.logged_in:
                             ahora = datetime.now()
                             fecha_str = ahora.strftime("%Y-%m-%d")
                             hora_str = ahora.strftime("%H:%M:%S")
+                            created_at = ahora.strftime("%Y-%m-%d %H:%M:%S")
                             cursor.execute("""
                                 SELECT * FROM asistencias
-                                WHERE Nombre = %s AND ID_Materia = %s AND Fecha = %s;
+                                WHERE nombre = %s AND id_materia = %s AND fecha = %s;
                             """, (estudiante, materias[materia_seleccionada], fecha_str))
                             existe = cursor.fetchall()
                             if existe:
                                 st.warning("Ya has registrado asistencia para esta materia hoy.")
                             else:
                                 cursor.execute("""
-                                    INSERT INTO asistencias (Nombre, ID_Materia, Materia, Fecha, Hora)
-                                    VALUES (%s, %s, %s, %s, %s);
-                                """, (estudiante, materias[materia_seleccionada], materia_seleccionada, fecha_str, hora_str))
+                                    INSERT INTO asistencias (nombre, id_materia, materia, fecha, hora, created_at)
+                                    VALUES (%s, %s, %s, %s, %s, %s);
+                                """, (estudiante, materias[materia_seleccionada], materia_seleccionada, fecha_str, hora_str, created_at))
                                 conn.commit()
                                 st.success(f"Asistencia registrada para {materia_seleccionada} - {fecha_str} {hora_str}")
                             cursor.close()
@@ -194,10 +195,10 @@ if st.session_state.logged_in:
                 filtro_materia = st.selectbox("Filtrar por materia:", lista_materias)
                 filtro_fecha = st.date_input("Filtrar por fecha:")
                 if filtro_materia != "Todas":
-                    df = df[df['Materia'] == filtro_materia]
+                    df = df[df['materia'] == filtro_materia]
                 if filtro_fecha:
                     fecha_str = filtro_fecha.strftime("%Y-%m-%d")
-                    df = df[df['Fecha'] == fecha_str]
+                    df = df[df['fecha'] == fecha_str]
                 st.subheader("Registros de Asistencia")
                 st.dataframe(df)
             except Exception as e:
