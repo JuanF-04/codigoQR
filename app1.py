@@ -1,3 +1,4 @@
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -7,11 +8,9 @@ from datetime import datetime
 import os
 import psycopg2
 
-# Configuración de la página
 st.set_page_config(page_title="Asistencia QR", page_icon="🎓", layout="centered")
 st.title("📚 Registro de Asistencia - App Streamlit")
 
-# Conexión a Supabase vía PostgreSQL (psycopg2)
 def conectar_bd():
     try:
         conn = psycopg2.connect(
@@ -26,7 +25,6 @@ def conectar_bd():
         st.error(f"Error de conexión a Supabase: {e}")
         return None
 
-# Materias y códigos QR
 materias = {
     "Álgebra Lineal": "MAT01",
     "Cálculo Diferencial": "MAT02",
@@ -38,14 +36,12 @@ materias = {
     "Redes de Computadoras": "MAT08"
 }
 
-# Generar QR si no existen
 for nombre, qr_id in materias.items():
     nombre_archivo = f"QR_{nombre.replace(' ', '')}.png"
     if not os.path.exists(nombre_archivo):
         img_qr = qrcode.make(qr_id)
         img_qr.save(nombre_archivo)
 
-# Cargar usuarios desde Supabase
 def cargar_usuarios():
     conn = conectar_bd()
     if conn:
@@ -57,7 +53,6 @@ def cargar_usuarios():
             st.error(f"No se pudo cargar usuarios: {e}")
     return pd.DataFrame()
 
-# Registrar usuario en Supabase
 def registrar_usuario(nuevo_usuario, nombre_completo, password, rol):
     conn = conectar_bd()
     if conn:
@@ -73,7 +68,6 @@ def registrar_usuario(nuevo_usuario, nombre_completo, password, rol):
         except Exception as e:
             st.error(f"No se pudo registrar el usuario: {e}")
 
-# Autenticar usuario
 def autenticar_usuario(usuario, password):
     df = cargar_usuarios()
     registro = df[(df['usuario'] == usuario) & (df['password'] == password)]
@@ -81,14 +75,12 @@ def autenticar_usuario(usuario, password):
         return registro.iloc[0]['nombre'], registro.iloc[0]['rol']
     return None, None
 
-# Inicializar sesión
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
     st.session_state.usuario = ""
     st.session_state.nombre = ""
     st.session_state.rol = ""
 
-# Login o registro
 if not st.session_state.logged_in:
     opcion = st.radio("Seleccione una opción:", ["Iniciar Sesión", "Registrarse"], index=0)
     if opcion == "Iniciar Sesión":
@@ -103,7 +95,7 @@ if not st.session_state.logged_in:
                 st.session_state.nombre = nombre
                 st.session_state.rol = rol
                 st.success(f"Bienvenido, **{nombre}**. Has iniciado sesión como **{rol}**.")
-                st.experimental_rerun()
+                st.rerun()
             else:
                 st.error("Usuario o contraseña incorrectos.")
     else:
@@ -122,9 +114,8 @@ if not st.session_state.logged_in:
                 else:
                     registrar_usuario(nuevo_usuario, nombre_completo, password, rol)
                     st.success("Registro exitoso. Inicia sesión en la pestaña 'Iniciar Sesión'.")
-                    st.experimental_rerun()
+                    st.rerun()
 
-# Usuario autenticado
 if st.session_state.logged_in:
     st.sidebar.success(f"Sesión: {st.session_state.nombre} ({st.session_state.rol})")
     if st.button("Cerrar Sesión"):
@@ -132,7 +123,7 @@ if st.session_state.logged_in:
         st.session_state.usuario = ""
         st.session_state.nombre = ""
         st.session_state.rol = ""
-        st.experimental_rerun()
+        st.rerun()
 
     if st.session_state.rol == "estudiante":
         st.header("Registrar Asistencia")
