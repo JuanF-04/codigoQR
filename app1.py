@@ -141,7 +141,10 @@ if st.session_state.logged_in:
         st.header("Registrar Asistencia")
         mat_sel = st.selectbox("Materia:", list(materias.keys()))
         qr_file = f"QR_{mat_sel.replace(' ', '')}.png"
-        st.image(qr_file, width=150, caption=f"QR de {mat_sel}") if os.path.exists(qr_file) else None
+
+        # Mostrar QR sólo si existe
+        if os.path.exists(qr_file):
+            st.image(qr_file, width=150, caption=f"QR de {mat_sel}")
 
         if "qr_mode" not in st.session_state:
             st.session_state.qr_mode = False
@@ -204,7 +207,8 @@ if st.session_state.logged_in:
             filtro_fec = st.date_input("Filtrar fecha:")
             if filtro_mat != "Todas":
                 df = df[df['materia'] == filtro_mat]
-            df = df[df['fecha'] == filtro_fec.strftime("%Y-%m-%d")] if filtro_fec else df
+            if filtro_fec:
+                df = df[df['fecha'] == filtro_fec.strftime("%Y-%m-%d")]
             st.subheader("Registros de Asistencia")
             st.dataframe(df)
         else:
