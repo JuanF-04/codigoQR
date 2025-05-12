@@ -88,9 +88,9 @@ def autenticar_usuario(usuario, password):
 # Estado de sesión
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
-    st.session_state.usuario = ""
-    st.session_state.nombre = ""
-    st.session_state.rol = ""
+    st.session_state.usuario   = ""
+    st.session_state.nombre    = ""
+    st.session_state.rol       = ""
 
 # Pantalla de login / registro
 if not st.session_state.logged_in:
@@ -103,9 +103,9 @@ if not st.session_state.logged_in:
             nombre, rol = autenticar_usuario(usuario, password)
             if nombre:
                 st.session_state.logged_in = True
-                st.session_state.usuario = usuario
-                st.session_state.nombre  = nombre
-                st.session_state.rol     = rol
+                st.session_state.usuario    = usuario
+                st.session_state.nombre     = nombre
+                st.session_state.rol        = rol
                 st.success(f"Bienvenido, **{nombre}**. Rol: **{rol}**.")
                 st.rerun()
             else:
@@ -117,7 +117,7 @@ if not st.session_state.logged_in:
         password        = st.text_input("Contraseña", type="password")
         rol             = "estudiante"
         if st.button("Crear Cuenta"):
-            if not nuevo_usuario or not nombre_completo or not password:
+            if not (nuevo_usuario and nombre_completo and password):
                 st.warning("Complete todos los campos.")
             else:
                 df = cargar_usuarios()
@@ -125,7 +125,7 @@ if not st.session_state.logged_in:
                     st.error("El nombre de usuario ya existe.")
                 else:
                     registrar_usuario(nuevo_usuario, nombre_completo, password, rol)
-                    st.success("Registro exitoso. Ahora inicie sesión.")
+                    st.success("✅ ¡Te has registrado exitosamente! Ahora serás redirigido a Iniciar Sesión...")
                     st.rerun()
 
 # Interfaz tras login
@@ -142,7 +142,6 @@ if st.session_state.logged_in:
         mat_sel = st.selectbox("Materia:", list(materias.keys()))
         qr_file = f"QR_{mat_sel.replace(' ', '')}.png"
 
-        # Mostrar QR sólo si existe
         if os.path.exists(qr_file):
             st.image(qr_file, width=150, caption=f"QR de {mat_sel}")
 
@@ -151,9 +150,11 @@ if st.session_state.logged_in:
 
         col1, col2 = st.columns(2)
         if col1.button("📷 Activar escáner QR"):
-            st.session_state.qr_mode = True; st.rerun()
+            st.session_state.qr_mode = True
+            st.rerun()
         if col2.button("❌ Cancelar"):
-            st.session_state.qr_mode = False; st.rerun()
+            st.session_state.qr_mode = False
+            st.rerun()
 
         if st.session_state.qr_mode:
             img = st.camera_input("Escanea el código QR")
