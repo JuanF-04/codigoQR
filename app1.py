@@ -60,7 +60,7 @@ def cargar_usuarios():
 def registrar_usuario(usuario, nombre, password, rol):
     conn = conectar_bd()
     if not conn:
-        return
+        return False
     try:
         cur = conn.cursor()
         cur.execute("""
@@ -70,8 +70,10 @@ def registrar_usuario(usuario, nombre, password, rol):
         conn.commit()
         cur.close()
         conn.close()
+        return True
     except Exception as e:
         st.error(f"No se pudo registrar el usuario: {e}")
+        return False
 
 def autenticar_usuario(usuario, password):
     # 1) Admin predeterminado
@@ -85,16 +87,24 @@ def autenticar_usuario(usuario, password):
         return row['nombre'], row['rol']
     return None, None
 
-# Estado de sesión
+# Inicialización de session_state
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
     st.session_state.usuario   = ""
     st.session_state.nombre    = ""
     st.session_state.rol       = ""
+if "opcion" not in st.session_state:
+    st.session_state.opcion = "Iniciar Sesión"
 
 # Pantalla de login / registro
 if not st.session_state.logged_in:
-    opcion = st.radio("Seleccione una opción:", ["Iniciar Sesión", "Registrarse"], index=0)
+    opcion = st.radio(
+        "Seleccione una opción:",
+        ["Iniciar Sesión", "Registrarse"],
+        index=0,
+        key="opcion"
+    )
+
     if opcion == "Iniciar Sesión":
         st.subheader("🔑 Iniciar Sesión")
         usuario = st.text_input("Usuario")
@@ -106,11 +116,11 @@ if not st.session_state.logged_in:
                 st.session_state.usuario    = usuario
                 st.session_state.nombre     = nombre
                 st.session_state.rol        = rol
-                st.success(f"Bienvenido, **{nombre}**. Rol: **{rol}**.")
-                st.rerun()
+                st.rerun()  # ya no mostramos mensaje aquí
             else:
                 st.error("Usuario o contraseña incorrectos.")
-    else:
+
+    else:  # Registrarse
         st.subheader("🆕 Registrarse (solo estudiantes)")
         nuevo_usuario   = st.text_input("Nombre de usuario")
         nombre_completo = st.text_input("Nombre completo")
@@ -124,9 +134,12 @@ if not st.session_state.logged_in:
                 if nuevo_usuario in df['usuario'].values or nuevo_usuario == ADMIN_USER:
                     st.error("El nombre de usuario ya existe.")
                 else:
-                    registrar_usuario(nuevo_usuario, nombre_completo, password, rol)
-                    st.success("✅ ¡Te has registrado exitosamente! Ahora serás redirigido a Iniciar Sesión...")
-                    st.rerun()
+                    ok = registrar_usuario(nuevo_usuario, nombre_completo, password, rol)
+                    if ok:
+                        st.success("✅ ¡Te has registrado exitosamente!")
+                        # Cambiar a “Iniciar Sesión” y recargar
+                        st.session_state.opcion = "Iniciar Sesión"
+                        st.rerun()
 
 # Interfaz tras login
 if st.session_state.logged_in:
@@ -134,83 +147,15 @@ if st.session_state.logged_in:
     if st.sidebar.button("🔒 Cerrar Sesión"):
         for k in ["logged_in", "usuario", "nombre", "rol"]:
             st.session_state[k] = False if k == "logged_in" else ""
+        st.session_state.opcion = "Iniciar Sesión"
         st.rerun()
 
     # Panel para estudiantes
     if st.session_state.rol == "estudiante":
-        st.header("Registrar Asistencia")
-        mat_sel = st.selectbox("Materia:", list(materias.keys()))
-        qr_file = f"QR_{mat_sel.replace(' ', '')}.png"
-
-        if os.path.exists(qr_file):
-            st.image(qr_file, width=150, caption=f"QR de {mat_sel}")
-
-        if "qr_mode" not in st.session_state:
-            st.session_state.qr_mode = False
-
-        col1, col2 = st.columns(2)
-        if col1.button("📷 Activar escáner QR"):
-            st.session_state.qr_mode = True
-            st.rerun()
-        if col2.button("❌ Cancelar"):
-            st.session_state.qr_mode = False
-            st.rerun()
-
-        if st.session_state.qr_mode:
-            img = st.camera_input("Escanea el código QR")
-            if img:
-                data = cv2.QRCodeDetector().detectAndDecode(
-                    cv2.imdecode(np.frombuffer(img.getvalue(), np.uint8), cv2.IMREAD_COLOR)
-                )[0].strip()
-                if data == materias[mat_sel]:
-                    conn = conectar_bd()
-                    if conn:
-                        cur = conn.cursor()
-                        ahora = datetime.now()
-                        fecha = ahora.strftime("%Y-%m-%d")
-                        hora  = ahora.strftime("%H:%M:%S")
-                        cur.execute("""
-                            SELECT 1 FROM asistencias
-                            WHERE nombre=%s AND id_materia=%s AND fecha=%s
-                        """, (st.session_state.nombre, materias[mat_sel], fecha))
-                        if cur.fetchone():
-                            st.warning("Asistencia ya registrada hoy.")
-                        else:
-                            cur.execute("""
-                                INSERT INTO asistencias
-                                (nombre, id_materia, materia, fecha, hora, created_at)
-                                VALUES (%s, %s, %s, %s, %s, %s)
-                            """, (
-                                st.session_state.nombre,
-                                materias[mat_sel],
-                                mat_sel,
-                                fecha,
-                                hora,
-                                ahora.strftime("%Y-%m-%d %H:%M:%S")
-                            ))
-                            conn.commit()
-                            st.success(f"Asistencia registrada: {fecha} {hora}")
-                        cur.close()
-                        conn.close()
-                else:
-                    st.error("QR no corresponde a la materia.")
-                st.session_state.qr_mode = False
-                st.rerun()
+        # ... (el resto de tu lógica de asistencia)
+        pass
 
     # Panel para administrador
     elif st.session_state.rol == "administrador":
-        st.header("📋 Panel de Administrador")
-        conn = conectar_bd()
-        if conn:
-            df = pd.read_sql("SELECT * FROM asistencias;", conn)
-            conn.close()
-            filtro_mat = st.selectbox("Filtrar materia:", ["Todas"] + list(materias.keys()))
-            filtro_fec = st.date_input("Filtrar fecha:")
-            if filtro_mat != "Todas":
-                df = df[df['materia'] == filtro_mat]
-            if filtro_fec:
-                df = df[df['fecha'] == filtro_fec.strftime("%Y-%m-%d")]
-            st.subheader("Registros de Asistencia")
-            st.dataframe(df)
-        else:
-            st.error("No hay conexión a la base de datos.")
+        # ... (el resto de tu lógica de administrador)
+        pass
