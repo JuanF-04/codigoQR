@@ -28,22 +28,13 @@ def conectar_bd():
         return None
 
 # Diccionario de materias y sus IDs
-materias = {
-    "Álgebra Lineal": "MAT01",
-    "Cálculo Diferencial": "MAT02",
-    "Física General": "MAT03",
-    "Programación I": "MAT04",
-    "Bases de Datos": "MAT05",
-    "Estadística": "MAT06",
-    "Inteligencia Artificial": "MAT07",
-    "Redes de Computadoras": "MAT08"
-}
+materias = { ... }  # igual que antes
 
-# Generar códigos QR si no existen
+# Generar QR si no existen
 for nombre, qr_id in materias.items():
-    nombre_archivo = f"QR_{nombre.replace(' ', '')}.png"
-    if not os.path.exists(nombre_archivo):
-        qrcode.make(qr_id).save(nombre_archivo)
+    fn = f"QR_{nombre.replace(' ', '')}.png"
+    if not os.path.exists(fn):
+        qrcode.make(qr_id).save(fn)
 
 def cargar_usuarios():
     conn = conectar_bd()
@@ -76,86 +67,69 @@ def registrar_usuario(usuario, nombre, password, rol):
         return False
 
 def autenticar_usuario(usuario, password):
-    # 1) Admin predeterminado
     if usuario == ADMIN_USER and password == ADMIN_PASS:
         return "Administrador de sistema", "administrador"
-    # 2) Usuarios en BD
     df = cargar_usuarios()
-    match = df[(df['usuario'] == usuario) & (df['password'] == password)]
-    if not match.empty:
-        row = match.iloc[0]
-        return row['nombre'], row['rol']
+    m = df[(df['usuario']==usuario)&(df['password']==password)]
+    if not m.empty:
+        r = m.iloc[0]
+        return r['nombre'], r['rol']
     return None, None
 
-# Inicialización de session_state
+# Estado inicial
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
-    st.session_state.usuario   = ""
-    st.session_state.nombre    = ""
-    st.session_state.rol       = ""
-if "opcion" not in st.session_state:
-    st.session_state.opcion = "Iniciar Sesión"
+    st.session_state.usuario = ""
+    st.session_state.nombre  = ""
+    st.session_state.rol     = ""
 
-# Pantalla de login / registro
+# Login / Registro
 if not st.session_state.logged_in:
-    opcion = st.radio(
-        "Seleccione una opción:",
-        ["Iniciar Sesión", "Registrarse"],
-        index=0,
-        key="opcion"
-    )
-
+    opcion = st.radio("Seleccione una opción:", ["Iniciar Sesión", "Registrarse"])
+    
     if opcion == "Iniciar Sesión":
         st.subheader("🔑 Iniciar Sesión")
-        usuario = st.text_input("Usuario")
-        password = st.text_input("Contraseña", type="password")
+        usr = st.text_input("Usuario")
+        pwd = st.text_input("Contraseña", type="password")
         if st.button("Ingresar"):
-            nombre, rol = autenticar_usuario(usuario, password)
+            nombre, rol = autenticar_usuario(usr, pwd)
             if nombre:
                 st.session_state.logged_in = True
-                st.session_state.usuario    = usuario
+                st.session_state.usuario    = usr
                 st.session_state.nombre     = nombre
                 st.session_state.rol        = rol
-                st.rerun()  # ya no mostramos mensaje aquí
+                st.experimental_rerun()
             else:
                 st.error("Usuario o contraseña incorrectos.")
-
-    else:  # Registrarse
+    else:
         st.subheader("🆕 Registrarse (solo estudiantes)")
-        nuevo_usuario   = st.text_input("Nombre de usuario")
-        nombre_completo = st.text_input("Nombre completo")
-        password        = st.text_input("Contraseña", type="password")
-        rol             = "estudiante"
+        nuevo_usr   = st.text_input("Nombre de usuario")
+        nom_compl   = st.text_input("Nombre completo")
+        pwd_new     = st.text_input("Contraseña", type="password")
+        rol_new     = "estudiante"
         if st.button("Crear Cuenta"):
-            if not (nuevo_usuario and nombre_completo and password):
+            if not (nuevo_usr and nom_compl and pwd_new):
                 st.warning("Complete todos los campos.")
             else:
                 df = cargar_usuarios()
-                if nuevo_usuario in df['usuario'].values or nuevo_usuario == ADMIN_USER:
+                if nuevo_usr in df['usuario'].values or nuevo_usr == ADMIN_USER:
                     st.error("El nombre de usuario ya existe.")
                 else:
-                    ok = registrar_usuario(nuevo_usuario, nombre_completo, password, rol)
-                    if ok:
+                    if registrar_usuario(nuevo_usr, nom_compl, pwd_new, rol_new):
                         st.success("✅ ¡Te has registrado exitosamente!")
-                        # Cambiar a “Iniciar Sesión” y recargar
-                        st.session_state.opcion = "Iniciar Sesión"
-                        st.rerun()
+                        st.experimental_rerun()
 
-# Interfaz tras login
+# Panel tras login
 if st.session_state.logged_in:
     st.sidebar.success(f"{st.session_state.nombre} ({st.session_state.rol})")
     if st.sidebar.button("🔒 Cerrar Sesión"):
         for k in ["logged_in", "usuario", "nombre", "rol"]:
-            st.session_state[k] = False if k == "logged_in" else ""
-        st.session_state.opcion = "Iniciar Sesión"
-        st.rerun()
+            st.session_state[k] = False if k=="logged_in" else ""
+        st.experimental_rerun()
 
-    # Panel para estudiantes
     if st.session_state.rol == "estudiante":
-        # ... (el resto de tu lógica de asistencia)
+        # ... tu lógica de escaneo y registro de asistencia ...
         pass
-
-    # Panel para administrador
     elif st.session_state.rol == "administrador":
-        # ... (el resto de tu lógica de administrador)
+        # ... tu lógica de panel admin ...
         pass
