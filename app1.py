@@ -197,20 +197,35 @@ if st.session_state.logged_in:
                 st.session_state.qr_mode = False
                 st.rerun()
 
-    # Panel para administrador
-    elif st.session_state.rol == "administrador":
-        st.header("📋 Panel de Administrador")
-        conn = conectar_bd()
-        if conn:
-            df = pd.read_sql("SELECT * FROM asistencias;", conn)
-            conn.close()
-            filtro_mat = st.selectbox("Filtrar materia:", ["Todas"] + list(materias.keys()))
-            filtro_fec = st.date_input("Filtrar fecha:")
-            if filtro_mat != "Todas":
-                df = df[df['materia'] == filtro_mat]
-            if filtro_fec:
-                df = df[df['fecha'] == filtro_fec.strftime("%Y-%m-%d")]
-            st.subheader("Registros de Asistencia")
-            st.dataframe(df)
+   # Panel para administrador
+elif st.session_state.rol == "administrador":
+    st.header("📋 Panel de Administrador")
+    conn = conectar_bd()
+    if conn:
+        df = pd.read_sql("SELECT * FROM asistencias;", conn)
+        conn.close()
+
+        # Convertir fecha a tipo date
+        df['fecha'] = pd.to_datetime(df['fecha']).dt.date
+
+        # Filtros
+        filtro_mat = st.selectbox("Filtrar materia:", ["Todas"] + list(materias.keys()))
+        filtro_fec = st.date_input("Filtrar fecha:", value=datetime.now().date())
+
+        if filtro_mat != "Todas":
+            df = df[df['materia'] == filtro_mat]
+
+        if filtro_fec:
+            df = df[df['fecha'] == filtro_fec]
+
+        st.subheader("Registros de Asistencia")
+        if df.empty:
+            st.warning("No hay asistencias registradas para los filtros seleccionados.")
         else:
-            st.error("No hay conexión a la base de datos.")
+            st.dataframe(df)
+
+        # Opcional: para debug
+        # st.write("Datos crudos:", df)
+
+    else:
+        st.error("No hay conexión a la base de datos.")
