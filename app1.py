@@ -39,7 +39,7 @@ materias = {
     "Redes de Computadoras": "MAT08"
 }
 
-# Generar códigos QR si no existen
+# Generar códigos QR
 for nombre, qr_id in materias.items():
     nombre_archivo = f"QR_{nombre.replace(' ', '')}.png"
     if not os.path.exists(nombre_archivo):
@@ -197,26 +197,27 @@ if st.session_state.logged_in:
                 st.session_state.qr_mode = False
                 st.rerun()
 
-   # Panel para administrador
-elif st.session_state.rol == "administrador":
-    st.header("📋 Panel de Administrador")
-    conn = conectar_bd()
-    if conn:
-        df = pd.read_sql("SELECT * FROM asistencias;", conn)
-        conn.close()
+    # Panel para administrador
+    elif st.session_state.rol == "administrador":
+        st.header("📋 Panel de Administrador")
+        conn = conectar_bd()
+        if conn:
+            df = pd.read_sql("SELECT * FROM asistencias;", conn)
+            conn.close()
 
-        # Filtro de materia
-        filtro_mat = st.selectbox("Filtrar materia:", ["Todas"] + list(materias.keys()))
-        if filtro_mat != "Todas":
-            df = df[df['materia'] == filtro_mat]
+            # Filtro de materia
+            filtro_mat = st.selectbox("Filtrar materia:", ["Todas"] + list(materias.keys()))
+            if filtro_mat != "Todas":
+                df = df[df['materia'] == filtro_mat]
 
-        # Filtro de fecha opcional
-        filtrar_por_fecha = st.checkbox("Filtrar por fecha", value=False)
-        if filtrar_por_fecha:
-            fecha_sel = st.date_input("Seleccione fecha")
-            df = df[df['fecha'] == fecha_sel.strftime("%Y-%m-%d")]
+            # Filtro de fecha opcional
+            filtrar_por_fecha = st.checkbox("Filtrar por fecha", value=False)
+            if filtrar_por_fecha:
+                fecha_sel = st.date_input("Seleccione fecha")
+                df = df[df['fecha'] == fecha_sel.strftime("%Y-%m-%d")]
 
-        st.subheader("Registros de Asistencia")
-        st.dataframe(df)
-    else:
-        st.error("No hay conexión a la base de datos.")
+            # Mostrar siempre la tabla
+            st.subheader("Registros de Asistencia")
+            st.dataframe(df)
+        else:
+            st.error("No hay conexión a la base de datos.")
