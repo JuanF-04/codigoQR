@@ -13,31 +13,22 @@ ADMIN_PASS = "123"
 
 st.set_page_config(page_title="Asistencia QR", page_icon="🎓", layout="centered")
 
-# 1) Función helper para fondo
+# — Función helper para fondo —
 def set_bg(style: str):
-    """Recibe CSS dentro de <style> para pintar el fondo."""
     st.markdown(f"<style>{style}</style>", unsafe_allow_html=True)
 
-# 2) CSS por sección (pueden ser imágenes o colores)
+# — CSS por sección —
 CSS_LOGIN = """
-.stApp {
-    background: linear-gradient(135deg, #89f7fe 0%, #66a6ff 100%);
-}
+.stApp { background: linear-gradient(135deg, #89f7fe 0%, #66a6ff 100%); }
 """
 CSS_REGISTER = """
-.stApp {
-    background: linear-gradient(135deg, #c3ffbd 0%, #69d2e7 100%);
-}
+.stApp { background: linear-gradient(135deg, #c3ffbd 0%, #69d2e7 100%); }
 """
 CSS_ESTUDIANTE = """
-.stApp {
-    background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
-}
+.stApp { background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%); }
 """
 CSS_ADMIN = """
-.stApp {
-    background: linear-gradient(135deg, #f8cdda 0%, #1d2b64 100%);
-}
+.stApp { background: linear-gradient(135deg, #f8cdda 0%, #1d2b64 100%); }
 """
 
 st.title("📚 Registro de Asistencia - App Streamlit")
@@ -55,7 +46,6 @@ def conectar_bd():
         st.error(f"Error de conexión: {e}")
         return None
 
-# Diccionario de materias...
 materias = {
     "Álgebra Lineal": "MAT01",
     "Cálculo Diferencial": "MAT02",
@@ -67,13 +57,12 @@ materias = {
     "Redes de Computadoras": "MAT08"
 }
 
-# Generar QR estático...
+# Generar QRs estáticos
 for nombre, qr_id in materias.items():
     fn = f"QR_{nombre.replace(' ','')}.png"
     if not os.path.exists(fn):
         qrcode.make(qr_id).save(fn)
 
-# funciones cargar_usuarios, registrar_usuario, autenticar_usuario (idénticas)
 def cargar_usuarios():
     conn = conectar_bd()
     if not conn: return pd.DataFrame()
@@ -104,24 +93,34 @@ def autenticar_usuario(usuario, password):
     if usuario == ADMIN_USER and password == ADMIN_PASS:
         return "Administrador de sistema", "administrador"
     df = cargar_usuarios()
-    match = df[(df.usuario==usuario)&(df.password==password)]
+    match = df[(df.usuario == usuario) & (df.password == password)]
     if not match.empty:
         row = match.iloc[0]
         return row.nombre, row.rol
     return None, None
 
-# Sesión
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
-    st.session_state.usuario   = ""
-    st.session_state.nombre    = ""
-    st.session_state.rol       = ""
+# — Inicializar sesión y flags —
+if "logged_in"   not in st.session_state: st.session_state.logged_in = False
+if "usuario"     not in st.session_state: st.session_state.usuario   = ""
+if "nombre"      not in st.session_state: st.session_state.nombre    = ""
+if "rol"         not in st.session_state: st.session_state.rol       = ""
+if "opcion"      not in st.session_state: st.session_state.opcion    = "Iniciar Sesión"
+if "just_registered" not in st.session_state: st.session_state.just_registered = False
+
+# — Si acaban de registrarse, forzamos login —
+if st.session_state.just_registered:
+    st.session_state.opcion = "Iniciar Sesión"
+    st.session_state.just_registered = False
+    st.rerun()
 
 # —– Login / Registro —–
 if not st.session_state.logged_in:
-    opcion = st.radio("Seleccione una opción:", ["Iniciar Sesión","Registrarse"], index=0)
+    opcion = st.radio("Seleccione una opción:",
+                      ["Iniciar Sesión", "Registrarse"],
+                      key="opcion")
+
     if opcion == "Iniciar Sesión":
-        set_bg(CSS_LOGIN)                 # <- fondo login
+        set_bg(CSS_LOGIN)
         st.subheader("🔑 Iniciar Sesión")
         user = st.text_input("Usuario")
         pwd  = st.text_input("Contraseña", type="password")
@@ -138,8 +137,9 @@ if not st.session_state.logged_in:
                 st.rerun()
             else:
                 st.error("Usuario o contraseña incorrectos.")
+
     else:
-        set_bg(CSS_REGISTER)              # <- fondo registro
+        set_bg(CSS_REGISTER)
         st.subheader("🆕 Registrarse (solo estudiantes)")
         new_u = st.text_input("Nombre de usuario")
         full  = st.text_input("Nombre completo")
@@ -149,42 +149,47 @@ if not st.session_state.logged_in:
                 st.warning("Complete todos los campos.")
             else:
                 df = cargar_usuarios()
-                if new_u in df.usuario.values or new_u==ADMIN_USER:
+                if new_u in df.usuario.values or new_u == ADMIN_USER:
                     st.error("El usuario ya existe.")
                 else:
                     registrar_usuario(new_u, full, pwd2, "estudiante")
                     st.success("✅ Registrado. Ahora inicia sesión.")
+                    # Marcamos que acabamos de registrarnos
+                    st.session_state.just_registered = True
+                    # Y recargamos para forzar el login
                     st.rerun()
 
 # —– Panel tras login —–
 if st.session_state.logged_in:
-    # cierre de sesión
     st.sidebar.success(f"{st.session_state.nombre} ({st.session_state.rol})")
     if st.sidebar.button("🔒 Cerrar Sesión"):
-        for k in ["logged_in","usuario","nombre","rol"]:
-            st.session_state[k] = False if k=="logged_in" else ""
+        for k in ["logged_in","usuario","nombre","rol","opcion","just_registered"]:
+            # logged_in a False, demás a vacío o False
+            st.session_state[k] = False if k=="logged_in" else "" if k in ["usuario","nombre","rol","opcion"] else False
+        st.session_state.opcion = "Iniciar Sesión"
         st.rerun()
 
     # Estudiante
     if st.session_state.rol == "estudiante":
-        set_bg(CSS_ESTUDIANTE)           # <- fondo estudiante
+        set_bg(CSS_ESTUDIANTE)
         st.header("Registrar Asistencia")
         mat_sel = st.selectbox("Materia:", list(materias.keys()))
         fn = f"QR_{mat_sel.replace(' ','')}.png"
         if os.path.exists(fn):
             st.image(fn, width=150, caption=f"QR de {mat_sel}")
-        if "qr_mode" not in st.session_state:
-            st.session_state.qr_mode = False
+
+        if "qr_mode" not in st.session_state: st.session_state.qr_mode = False
         c1, c2 = st.columns(2)
         if c1.button("📷 Escanear QR"):
             st.session_state.qr_mode = True; st.rerun()
         if c2.button("❌ Cancelar"):
             st.session_state.qr_mode = False; st.rerun()
+
         if st.session_state.qr_mode:
             img = st.camera_input("Escanea el QR")
             if img:
                 data = cv2.QRCodeDetector().detectAndDecode(
-                    cv2.imdecode(np.frombuffer(img.getvalue(),np.uint8),cv2.IMREAD_COLOR)
+                    cv2.imdecode(np.frombuffer(img.getvalue(), np.uint8), cv2.IMREAD_COLOR)
                 )[0].strip()
                 if data == materias[mat_sel]:
                     conn = conectar_bd()
@@ -196,15 +201,15 @@ if st.session_state.logged_in:
                         cur.execute("""
                             SELECT 1 FROM asistencias
                             WHERE nombre=%s AND id_materia=%s AND fecha=%s
-                        """,(st.session_state.nombre,materias[mat_sel],fstr))
+                        """, (st.session_state.nombre, materias[mat_sel], fstr))
                         if cur.fetchone():
                             st.warning("Asistencia ya registrada hoy.")
                         else:
                             cur.execute("""
                                 INSERT INTO asistencias
-                                (nombre,id_materia,materia,fecha,hora,created_at)
-                                VALUES (%s,%s,%s,%s,%s,%s)
-                            """,(
+                                (nombre, id_materia, materia, fecha, hora, created_at)
+                                VALUES (%s, %s, %s, %s, %s, %s)
+                            """, (
                                 st.session_state.nombre,
                                 materias[mat_sel],
                                 mat_sel,
@@ -213,7 +218,7 @@ if st.session_state.logged_in:
                                 now.strftime("%Y-%m-%d %H:%M:%S")
                             ))
                             conn.commit()
-                            st.success(f"Asistencia: {fstr} {hstr}")
+                            st.success(f"Asistencia registrada: {fstr} {hstr}")
                         cur.close(); conn.close()
                 else:
                     st.error("QR no coincide.")
@@ -222,22 +227,21 @@ if st.session_state.logged_in:
 
     # Administrador
     elif st.session_state.rol == "administrador":
-        set_bg(CSS_ADMIN)                # <- fondo admin
+        set_bg(CSS_ADMIN)
         st.header("📋 Panel de Administrador")
         conn = conectar_bd()
         if conn:
-            df = pd.read_sql("SELECT * FROM asistencias;",conn, parse_dates=["fecha"])
+            df = pd.read_sql("SELECT * FROM asistencias;", conn, parse_dates=["fecha"])
             conn.close()
             df["fecha"] = df["fecha"].dt.date
 
-            filtro_mat = st.selectbox("Filtrar materia:", ["Todas"]+list(materias.keys()))
-            if filtro_mat!="Todas":
-                df = df[df.materia==filtro_mat]
+            filtro_mat = st.selectbox("Filtrar materia:", ["Todas"] + list(materias.keys()))
+            if filtro_mat != "Todas":
+                df = df[df.materia == filtro_mat]
 
-            filtrar_fecha = st.checkbox("Filtrar por fecha", value=False)
-            if filtrar_fecha:
+            if st.checkbox("Filtrar por fecha"):
                 fecha_sel = st.date_input("Seleccione fecha")
-                df = df[df.fecha==fecha_sel]
+                df = df[df.fecha == fecha_sel]
 
             st.subheader("Registros de Asistencia")
             st.dataframe(df)
