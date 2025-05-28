@@ -202,19 +202,26 @@ if st.session_state.logged_in:
         st.header("📋 Panel de Administrador")
         conn = conectar_bd()
         if conn:
-            df = pd.read_sql("SELECT * FROM asistencias;", conn)
+            # --- Cargo datos y normalizo fecha a date ---
+            df = pd.read_sql(
+                "SELECT * FROM asistencias;",
+                conn,
+                parse_dates=["fecha"]
+            )
             conn.close()
+            # convierto Timestamp -> date
+            df["fecha"] = df["fecha"].dt.date
 
             # Filtro de materia
             filtro_mat = st.selectbox("Filtrar materia:", ["Todas"] + list(materias.keys()))
             if filtro_mat != "Todas":
-                df = df[df['materia'] == filtro_mat]
+                df = df[df["materia"] == filtro_mat]
 
             # Filtro de fecha opcional
             filtrar_por_fecha = st.checkbox("Filtrar por fecha", value=False)
             if filtrar_por_fecha:
-                fecha_sel = st.date_input("Seleccione fecha")
-                df = df[df['fecha'] == fecha_sel.strftime("%Y-%m-%d")]
+                fecha_sel = st.date_input("Seleccione fecha")  # devuelve datetime.date
+                df = df[df["fecha"] == fecha_sel]
 
             # Mostrar siempre la tabla
             st.subheader("Registros de Asistencia")
