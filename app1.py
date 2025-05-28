@@ -205,27 +205,18 @@ elif st.session_state.rol == "administrador":
         df = pd.read_sql("SELECT * FROM asistencias;", conn)
         conn.close()
 
-        # Convertir fecha a tipo date
-        df['fecha'] = pd.to_datetime(df['fecha']).dt.date
-
-        # Filtros
+        # Filtro de materia
         filtro_mat = st.selectbox("Filtrar materia:", ["Todas"] + list(materias.keys()))
-        filtro_fec = st.date_input("Filtrar fecha:", value=datetime.now().date())
-
         if filtro_mat != "Todas":
             df = df[df['materia'] == filtro_mat]
 
-        if filtro_fec:
-            df = df[df['fecha'] == filtro_fec]
+        # Filtro de fecha opcional
+        filtrar_por_fecha = st.checkbox("Filtrar por fecha", value=False)
+        if filtrar_por_fecha:
+            fecha_sel = st.date_input("Seleccione fecha")
+            df = df[df['fecha'] == fecha_sel.strftime("%Y-%m-%d")]
 
         st.subheader("Registros de Asistencia")
-        if df.empty:
-            st.warning("No hay asistencias registradas para los filtros seleccionados.")
-        else:
-            st.dataframe(df)
-
-        # Opcional: para debug
-        # st.write("Datos crudos:", df)
-
+        st.dataframe(df)
     else:
         st.error("No hay conexión a la base de datos.")
